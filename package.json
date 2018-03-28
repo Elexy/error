@@ -4,13 +4,15 @@
   "description": "show hapi logging error ",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js"
   },
   "author": "alex knol <alex.knol@nearform.com>",
   "license": "ISC",
   "dependencies": {
     "catbox-redis": "github:nearform/catbox-redis#pass_tls",
     "hapi": "^16.6.3",
-    "hapi-pino": "^4.0.3"
+    "hapi-pino": "^4.0.3",
+    "redis": "^2.8.0"
   }
 }

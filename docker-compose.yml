@@ -4,12 +4,14 @@ services:
     image: "redis:alpine"
     ports:
       - "6379:6379"
-    command: redis-server --tcp-keepalive=10
+    command: redis-server --timeout 10
   app:
     build:
       context: .
       dockerfile: Dockerfile
     depends_on:
       - redis
+    ports:
+      - "8000:8000"
     environment:
       REDIS_HOST: redis

@@ -3,68 +3,89 @@
 const env = process.env.NODE_ENV || 'dev'
 const Hapi = require('hapi')
 const pino = require('pino')
+const redis = require('redis')
 const conf = {
   pino: {
-    level: 'warn'
+    level: 'debug'
   },
-  port: 8000
+  port: 8000,
+  redisOpts: {}
 }
 const logger = pino(conf.pino)
 
-// const redisPlugin = {
-//   name: 'redisPlugin',
-//   version: '1.0.0',
-//   register: async function (server, options) {
-//     function initialErrorHandler (err) {
-//       logger.error(err)
-//       redisClient.quit()
+if (process.env.REDIS_PWD) {
+  conf.redisOpts.password = process.env.REDIS_PWD
+}
+if (process.env.REDIS_HOST) {
+  conf.redisOpts.host = process.env.REDIS_HOST
+}
+if (process.env.REDIS_PORT) {
+  conf.redisOpts.port = process.env.REDIS_PORT
+}
+conf.redisOpts.tls = process.env.REDIS_TLS || false
 
-//       callack(err)
-//     }
+function defaultErrorHandler (err) {
+  logger.error(err)
+}
 
-//     redisClient = redis.createClient(redisOpts)
+function initialErrorHandler (err) {
+  logger.error(err)
+  redisClient.quit()
+  process.exit(1)
+}
 
-//     redisClient.on('error', initialErrorHandler)
-//     redisClient.on('ready', function () {
-//       logger.info('redisClient connection created')
+let redisClient = redis.createClient(conf.redisOpts)
 
-//       if (redisClient) { // mitigating redisClient set to null
-//         redisClient.removeListener('error', initialErrorHandler)
-//         redisClient.on('error', defaultErrorHandler)
-//         redisClient.on('reconnecting', (obj) => {
-//           logger.debug(`Redis Reconnecting ${obj.delay}ms attempt: ${obj.attempt}`)
-//         })
-//         redisClient.on('end', () => {
-//           logger.debug(`Redis connection ended`)
-//           // causing an error here
-//           redisClient = null
-//         })
-//       }
+redisClient.on('error', initialErrorHandler)
+redisClient.on('ready', function () {
+  logger.info('redisClient connection created')
 
-//       callack(null, redisClient)
-//     })
-//   }
-// }
+  if (redisClient) { // mitigating redisClient set to null
+    redisClient.removeListener('error', initialErrorHandler)
+    redisClient.on('error', defaultErrorHandler)
+    redisClient.on('reconnecting', (obj) => {
+      logger.debug(`Redis Reconnecting ${obj.delay}ms attempt: ${obj.attempt}`)
+    })
+    redisClient.on('end', () => {
+      logger.debug(`Redis connection ended`)
+      // causing an error here
+      redisClient = null
+    })
+  }
+})
+
+process.on('uncaughtException', function (err) {
+  logger.error('uncaughtException:', err.message)
+  logger.error(err)
+  process.exit(1)
+})
 
 // Create a server with a host and port
 const server = new Hapi.Server()
-server.connection({ host: 'localhost', port: conf.port })
+server.connection({ host: '0.0.0.0', port: conf.port })
 
 // Add the route
 server.route({
   method: 'GET',
-  path: '/hello',
-  handler: function (request, h) {
-    return 'hello world'
+  path: '/',
+  handler: function (request, reply) {
+    redisClient.get('token', (err, result) => {
+      if (err || !result) {
+        reply(err)
+      }
+      return redisClient.set('token', true, 'EX', 10, (err, res) => {
+        if (err) {
+          reply(err)
+        }
+        reply('hello world')
+      })
+    })
   }
 })
 
-server.start()
-  .then(s => {
-    logger.info(`Server started on port ${conf.port}, in  ${env} mode`)
-  })
-  .catch(err => {
-    logger.error('uncaughtException:', err.message)
-    logger.error(err)
-    process.exit(1)
-  })
+server.start((err) => {
+  if (err) {
+    throw err
+  }
+  console.log(`Server running at: ${server.info.uri} in ${env} mode`)
+})
