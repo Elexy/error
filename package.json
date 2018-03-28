@@ -10,9 +10,8 @@
   "author": "alex knol <alex.knol@nearform.com>",
   "license": "ISC",
   "dependencies": {
-    "catbox-redis": "github:nearform/catbox-redis#pass_tls",
     "hapi": "^16.6.3",
-    "hapi-pino": "^4.0.3",
+    "hapi-pino": "2.2.0",
     "redis": "^2.8.0"
   }
 }
